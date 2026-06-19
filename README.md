@@ -113,6 +113,34 @@ in readability and scales to arbitrarily many groups.
   to `null`.
 - **Determinism**: `toGroup` is a pure function of the hash and the configured groups —
   same input, same output, every time.
+- **Thread-safety**: all state is immutable, so a single `GroupMapper` can be shared
+  across threads without synchronisation.
+
+## Performance & design trade-offs
+
+`toGroup` is the hot path (called once per identifier). It does one shift + one multiply
+to project the hash, then an O(log n) binary search with O(1) random access (`List.copyOf`
+returns an array-backed, `RandomAccess` list). It allocates nothing and is branch-light.
+Construction is a one-time O(n log n) sort plus an O(n) overlap check.
+
+Two deliberate choices are worth calling out:
+
+- **`List<Group>` rather than parallel primitive arrays.** The fastest-throughput variant
+  would store `double[] lowerBounds`, `double[] upperBounds`, and `String[] names` and
+  binary-search the `double[]` directly, avoiding object indirection. I kept the `Group`
+  abstraction instead: the speed difference is unmeasurable for realistic group counts (a
+  handful to dozens), and the record-based design is clearer and harder to get wrong (no
+  three-arrays-in-lockstep). For very large, hot group sets the primitive-array layout would
+  be the right optimisation — it isn't warranted here.
+- **Binary search rather than a linear scan.** For small `n` a linear scan can actually be
+  faster (better branch prediction, no log-factor overhead); it's a wash at this scale.
+  Binary search is kept because it signals intent and scales, at no readability cost.
+
+One inherent limit: the projection uses the **top 53 bits** of the hash (a `double`'s
+mantissa width), so the mapping has 53-bit resolution rather than full 64-bit. This has no
+effect on uniformity or on any realistic boundary. If exact full-resolution bucketing were
+ever required, the integer-threshold alternative (`Long.compareUnsigned`, described above)
+is the way to get it.
 
 ## Project layout
 
