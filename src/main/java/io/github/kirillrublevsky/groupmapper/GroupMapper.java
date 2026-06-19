@@ -1,4 +1,4 @@
-package com.example.groupmapper;
+package io.github.kirillrublevsky.groupmapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;

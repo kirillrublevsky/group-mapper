@@ -57,7 +57,7 @@ This is the only subtle part, because a Java `long` is **signed**: half of all v
 are negative. The right mental model is that the 64 hash bits encode an **unsigned**
 integer in `[0, 2^64)`, and the fraction we want is `unsigned(hash) / 2^64`.
 
-The implementation ([`GroupMapper.toFraction`](src/main/java/com/example/groupmapper/GroupMapper.java)):
+The implementation ([`GroupMapper.toFraction`](src/main/java/io/github/kirillrublevsky/groupmapper/GroupMapper.java)):
 
 ```java
 static double toFraction(long hashedIdentifier) {
@@ -90,8 +90,8 @@ floating-point projection because:
 
 Groups are sorted by lower bound and validated to be non-overlapping at construction, so
 a `GroupMapper` is **correct by construction**. Lookup is a binary search over the upper
-bounds — O(log n) — followed by a single lower-bound check that lets a hash falling in a
-gap return `null`:
+bounds — O(log n) — that locates the only candidate group, followed by a `Group.contains`
+membership check; this is what lets a hash falling in a gap return `null`:
 
 ```java
 public String toGroup(long hashedIdentifier) {
@@ -117,10 +117,13 @@ in readability and scales to arbitrarily many groups.
 ## Project layout
 
 ```
-src/main/java/com/example/groupmapper/Group.java         # immutable, validated range
-src/main/java/com/example/groupmapper/GroupMapper.java   # projection + lookup, the toGroup entry point
-src/test/java/com/example/groupmapper/GroupMapperTest.java
-transcripts/claude-session.md                            # AI usage transcript
+src/main/java/io/github/kirillrublevsky/groupmapper/
+├── Group.java          # immutable, validated [lower, upper) range
+└── GroupMapper.java    # projection + lookup; the toGroup entry point
+src/test/java/io/github/kirillrublevsky/groupmapper/
+└── GroupMapperTest.java
+transcripts/claude-session.md   # AI usage transcript
+LICENSE                         # MIT
 ```
 
 ## Building and testing
