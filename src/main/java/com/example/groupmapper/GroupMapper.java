@@ -73,9 +73,10 @@ public final class GroupMapper {
         }
 
         if (low < groups.size()) {
+            // The search guarantees fraction < candidate.upperBound(); contains() also
+            // checks the lower bound, which is what makes a hash in a gap return null.
             Group candidate = groups.get(low);
-            // Confirm the lower bound too; this is what makes a hash in a gap return null.
-            if (fraction >= candidate.lowerBound()) {
+            if (candidate.contains(fraction)) {
                 return candidate.name();
             }
         }

@@ -38,7 +38,8 @@ public record Group(String name, double lowerBound, double upperBound) {
     }
 
     /**
-     * @return {@code true} if {@code fraction} falls in this group's half-open range.
+     * @param fraction a value in {@code [0.0, 1.0)}
+     * @return {@code true} if {@code fraction} falls in this group's half-open range
      */
     public boolean contains(double fraction) {
         return fraction >= lowerBound && fraction < upperBound;
