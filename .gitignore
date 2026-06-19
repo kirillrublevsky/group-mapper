@@ -1,0 +1,16 @@
+# Maven
+target/
+
+# Local build output (manual javac runs)
+build/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
