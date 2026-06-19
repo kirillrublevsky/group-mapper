@@ -90,7 +90,8 @@ fine, but binary search costs nothing in readability and scales.
   share) which is the real proof the projection is uniform and unbiased.
 
 - The code was compiled with `javac` and the suite executed with the JUnit standalone
-  console runner. **All 10 tests pass.**
+  console runner. After the second-pass hardening (§6) the suite grew to **17 tests, all
+  passing**.
 
 ### 4.1 A real iteration the tests caught
 
@@ -111,10 +112,78 @@ why the sign-bit extremes are in the suite.
 
 ---
 
-## 5. How AI was used (summary)
+## 5. Optimality analysis
+
+Is this the optimal solution? The conclusion, after weighing the alternatives, is **yes —
+effectively optimal** for the problem as stated. The reasoning:
+
+### 5.1 Complexity
+
+- **`toGroup` (the hot path)** is O(log n) in the number of groups, branch-light, and
+  **allocates nothing** — it computes one `double` and runs an integer binary search over
+  an array. This is the operation that runs per identifier, so it is the one that matters.
+- **Construction** is O(n log n): one sort plus a single linear overlap scan. It runs once.
+
+For comparison-based range lookup, O(log n) per query is the asymptotic optimum; you cannot
+do better without exploiting extra structure (see below).
+
+### 5.2 Alternatives considered, and why they aren't better
+
+- **Linear scan instead of binary search.** For the 4-group example it is equivalent and
+  arguably has better constant factors (cache-friendly, no mispredicts). It was rejected
+  only because binary search costs nothing in readability and scales to many groups — a
+  deliberate "no-regret" choice, not a measured win.
+- **Exact integer thresholds** (`round(fraction · 2^64)` + `Long.compareUnsigned`). This is
+  the only approach that is *more* precise — exact at full 64-bit resolution with no
+  floating point. It was rejected because the boundaries themselves (`0.1`, `0.65`, …) are
+  decimal fractions that are not exactly representable anyway, so the precision gain is
+  theoretical, while the code is fiddlier (`fraction · 2^64` overflows `long` and needs care
+  near 1.0). Recorded in the README as the documented alternative.
+- **`TreeMap.floorEntry`.** Same O(log n) query, but you still must store the upper bound to
+  distinguish a real match from a gap, so it is no simpler than the explicit sorted array —
+  and it adds per-query autoboxing. No improvement.
+- **O(1) bucket table.** Only possible if boundaries align to a fixed grid (e.g. all are
+  multiples of 0.05). The task allows arbitrary boundaries, so a general O(1) table isn't
+  available without quantising the boundaries — a correctness trade we don't want.
+
+### 5.3 The projection is the genuinely optimal part
+
+`(hash >>> 11) * 0x1.0p-53` is not just convenient — it is **exact** (no rounding): the top
+53 bits fit a `double`'s mantissa precisely, and scaling by a power of two is lossless. It
+is also the canonical JDK idiom (`Random.nextDouble()`), so it is uniform by construction.
+There is no faster or more accurate way to obtain a uniform `double` fraction from 64 hash
+bits.
+
+**Verdict:** the design sits at the right point — optimal asymptotics on the hot path, an
+allocation-free exact projection, and the only "more precise" alternative buys nothing
+measurable while costing clarity.
+
+---
+
+## 6. Second-pass deep review (edge-case hardening)
+
+A dedicated re-review pass was run specifically hunting for edge cases. The projection and
+lookup logic held up under scrutiny (the exactness of `toFraction`, the strictly-ascending
+upper-bound invariant the binary search relies on, `fraction == upperBound` going to the
+next group, empty/NaN/Infinity handling). One real gap was found and fixed, and coverage
+was widened:
+
+- **Fix:** a `null` element inside the groups list previously failed obscurely during the
+  sort; it is now rejected up front with a clear `"groups must not contain null"` message.
+- **New tests (10 → 17):** empty configuration → `null`; a single full-coverage group that
+  must *never* return `null` over 100k hashes; the partition property (200k random hashes
+  always match when groups tile `[0,1)`); groups supplied out of order; a boundary shared by
+  two adjacent groups belonging to the upper one; a leading gap → `null`; and null-element
+  rejection.
+
+---
+
+## 7. How AI was used (summary)
 
 The assistant did the full reasoning above, chose technique (A) with an explicit
 rationale over (B), wrote `Group`, `GroupMapper`, the JUnit suite, the README, and
-this transcript, then compiled and ran the tests to confirm everything passes. The
-human reviewed the technical choices (especially the signed→unsigned projection) and
-the final structure.
+this transcript, then compiled and ran the tests to confirm everything passes. On
+request it then performed an explicit **optimality analysis** (§5) and a **second-pass
+edge-case review** (§6) that hardened the null-element handling and grew the suite to 17
+tests. The human reviewed the technical choices (especially the signed→unsigned
+projection and the optimality trade-offs) and the final structure.
