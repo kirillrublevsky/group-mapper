@@ -1,10 +1,12 @@
 package com.example.groupmapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +131,78 @@ class GroupMapperTest {
             assertTrue(Math.abs(actual - e.getValue()) < 0.01,
                     "group " + e.getKey() + " expected ~" + e.getValue() + " but got " + actual);
         }
+    }
+
+    /** An empty configuration maps everything to null without error. */
+    @Test
+    void emptyMapperReturnsNull() {
+        GroupMapper mapper = new GroupMapper(List.of());
+        assertNull(mapper.toGroup(0L));
+        assertNull(mapper.toGroup(-1L));
+        assertNull(mapper.toGroup(123456789L));
+    }
+
+    /** A single group spanning the whole interval captures every possible hash. */
+    @Test
+    void fullCoverageNeverReturnsNull() {
+        GroupMapper mapper = new GroupMapper(List.of(new Group("ALL", 0.0, 1.0)));
+        Random random = new Random(7);
+        for (int i = 0; i < 100_000; i++) {
+            assertEquals("ALL", mapper.toGroup(random.nextLong()));
+        }
+        assertEquals("ALL", mapper.toGroup(0L));  // smallest fraction
+        assertEquals("ALL", mapper.toGroup(-1L)); // largest fraction
+    }
+
+    /** When the groups fully partition [0,1), every hash matches exactly one group. */
+    @Test
+    void contiguousPartitionAlwaysMatches() {
+        GroupMapper mapper = exampleMapper();
+        Random random = new Random(99);
+        for (int i = 0; i < 200_000; i++) {
+            assertNotNull(mapper.toGroup(random.nextLong()));
+        }
+    }
+
+    /** Groups supplied out of order are sorted internally and still map correctly. */
+    @Test
+    void acceptsGroupsInAnyOrder() {
+        GroupMapper mapper = new GroupMapper(List.of(
+                new Group("D", 0.65, 1.0),
+                new Group("A", 0.0, 0.1),
+                new Group("C", 0.4, 0.65),
+                new Group("B", 0.1, 0.4)));
+        assertEquals("A", mapper.toGroup(hashForFraction(0.05)));
+        assertEquals("B", mapper.toGroup(hashForFraction(0.2)));
+        assertEquals("C", mapper.toGroup(hashForFraction(0.5)));
+        assertEquals("D", mapper.toGroup(hashForFraction(0.9)));
+    }
+
+    /** Adjacent groups may share a boundary value; it belongs to the upper group. */
+    @Test
+    void sharedBoundaryBelongsToUpperGroup() {
+        GroupMapper mapper = new GroupMapper(List.of(
+                new Group("low", 0.0, 0.5),
+                new Group("high", 0.5, 1.0)));
+        assertEquals("high", mapper.toGroup(hashForFraction(0.5)));
+        assertEquals("low", mapper.toGroup(hashForFraction(0.5) - 1));
+    }
+
+    /** A hash below the first group's lower bound (a leading gap) maps to null. */
+    @Test
+    void leadingGapReturnsNull() {
+        GroupMapper mapper = new GroupMapper(List.of(new Group("tail", 0.5, 1.0)));
+        assertNull(mapper.toGroup(hashForFraction(0.2)));
+        assertEquals("tail", mapper.toGroup(hashForFraction(0.7)));
+    }
+
+    /** Null elements in the group list are rejected rather than failing obscurely later. */
+    @Test
+    void rejectsNullGroupElements() {
+        List<Group> withNull = new ArrayList<>();
+        withNull.add(new Group("A", 0.0, 0.5));
+        withNull.add(null);
+        assertThrows(NullPointerException.class, () -> new GroupMapper(withNull));
     }
 
     /**

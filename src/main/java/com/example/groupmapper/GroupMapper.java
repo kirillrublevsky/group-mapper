@@ -34,6 +34,9 @@ public final class GroupMapper {
     public GroupMapper(List<Group> groups) {
         Objects.requireNonNull(groups, "groups must not be null");
         List<Group> sorted = new ArrayList<>(groups);
+        for (Group group : sorted) {
+            Objects.requireNonNull(group, "groups must not contain null");
+        }
         sorted.sort(Comparator.comparingDouble(Group::lowerBound));
         for (int i = 1; i < sorted.size(); i++) {
             Group previous = sorted.get(i - 1);

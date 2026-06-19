@@ -131,10 +131,20 @@ Requires JDK 17+.
 mvn test
 ```
 
-The suite covers boundary inclusivity, the sign-bit extremes (`0`, `-1`, `Long.MIN/MAX_VALUE`),
-determinism, gap → `null`, validation failures, and a **distribution test** that runs
-1,000,000 pseudo-random hashes and asserts each group's observed share is within ~1% of its
-configured share — the empirical proof that the projection is uniform and unbiased.
+The suite (17 tests) covers:
+
+- boundary inclusivity (`[lower, upper)`, and a boundary shared by two adjacent groups going
+  to the upper one);
+- the sign-bit extremes (`0`, `-1`, `Long.MIN/MAX_VALUE`) and negative hashes generally — the
+  proof there is no sign bias;
+- determinism (same input → same output across many calls);
+- gaps → `null` (both an interior gap and a leading gap), plus an empty configuration;
+- a full-coverage partition that must *never* return `null` over 200k random hashes;
+- validation failures (overlapping groups, malformed bounds, null elements) and acceptance of
+  groups supplied out of order;
+- a **distribution test** that runs 1,000,000 pseudo-random hashes and asserts each group's
+  observed share is within ~1% of its configured share — the empirical proof that the
+  projection is uniform and unbiased.
 
 ## Use of AI tools
 
